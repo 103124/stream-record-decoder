@@ -1,0 +1,21 @@
+{
+  "name": "stream-record-decoder",
+  "version": "1.0.0",
+  "description": "CDK construct that decodes DLQ'd DynamoDB stream records and stores in another DLQ",
+  "main": "index.js",
+  "directories": {
+    "lib": "lib"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@types/node": "^22.9.0",
+    "aws-cdk-lib": "^2.166.0",
+    "constructs": "^10.4.2",
+    "path": "^0.12.7"
+  }
+}
