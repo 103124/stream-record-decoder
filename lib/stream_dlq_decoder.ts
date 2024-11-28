@@ -4,7 +4,7 @@ import * as sqs from 'aws-cdk-lib/aws-sqs';
 import * as lambdaEventSources from 'aws-cdk-lib/aws-lambda-event-sources';
 import { Construct } from 'constructs';
 import * as path from 'path';
-import {Duration} from "aws-cdk-lib";
+import {aws_dynamodb, Duration} from "aws-cdk-lib";
 
 export interface StreamDLQDecoderProps {
   /**
@@ -12,30 +12,40 @@ export interface StreamDLQDecoderProps {
    */
   deadLetterQueue: sqs.IQueue;
   /**
+   * The DynamoDB table whose stream the Lambda function reads from
+   */
+  dynamoTable: aws_dynamodb.ITable;
+  /**
    * The destination queue the Lambda function writes to
    */
   destinationQueueProps: sqs.QueueProps;
 }
 
 export class StreamDLQDecoder extends Construct {
-  public readonly decoderFunction: lambda.Function;
+  public readonly function: lambda.Function;
   public readonly destinationQueue: sqs.IQueue;
 
   constructor(scope: Construct, id: string, props: StreamDLQDecoderProps) {
-    super(scope, id);
+    super(scope, id)
 
-    // TODO add role
+    const role = new cdk.aws_iam.Role(this, `${id}Role`, {
+      assumedBy: new cdk.aws_iam.ServicePrincipal('lambda.amazonaws.com'),
+    })
+    props.dynamoTable.grantStreamRead(role)
 
-    // Lambda function that uses the provided DLQ
-    this.decoderFunction = new lambda.Function(this, 'StreamDLQDecoderFunction', {
+    this.function = new lambda.Function(this, `${id}Function`, {
       runtime: lambda.Runtime.PROVIDED_AL2023,
       handler: 'bootstrap',
-      code: lambda.Code.fromAsset(path.join(__dirname, '../lambda')),
+      code: lambda.Code.fromAsset(path.join(__dirname, 'lambda')),
+      role: role,
       deadLetterQueueEnabled: false,
-    });
-    this.decoderFunction.addEventSource(new lambdaEventSources.SqsEventSource(props.deadLetterQueue))
+    })
+    this.function.addEventSource(new lambdaEventSources.SqsEventSource(props.deadLetterQueue))
 
-   // SQS queue where the function writes the decoded record
-   this.destinationQueue = new sqs.Queue(this, 'StreamDLQDecoderQueue', props.destinationQueueProps)
+   const defaultQueueProps: sqs.QueueProps = {
+     retentionPeriod: Duration.days(14),
+   }
+   this.destinationQueue = new sqs.Queue(this, `${id}Queue`, {...defaultQueueProps, ...props.destinationQueueProps})
+   this.destinationQueue.grantSendMessages(role)
   }
 }
